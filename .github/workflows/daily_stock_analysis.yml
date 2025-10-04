@@ -1,0 +1,41 @@
+# Name of the GitHub Action workflow
+name: Daily Stock N-Score Analysis
+
+# Controls when the action will run
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  
+  # Sets up a schedule to run the script automatically
+  schedule:
+    # This is a CRON job string that means "run at 08:00 UTC every day"
+    # You can adjust the time as needed.
+    - cron: '0 8 * * *'
+
+# Defines the job(s) that will run as part of the workflow
+jobs:
+  run-python-script:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # The sequence of tasks that will be executed
+    steps:
+      # 1. Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      # 2. Sets up the Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9' # You can use a different version if you prefer
+
+      # 3. Installs the Python dependencies from your requirements.txt file
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      # 4. Runs the Python script
+      - name: Run stock analysis script
+        run: python n_stock.py
