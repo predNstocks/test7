@@ -1,6 +1,10 @@
 # Name of the GitHub Action workflow
 name: Daily Stock N-Score Analysis
 
+env:
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  
 # Controls when the action will run
 on:
   # Allows you to run this workflow manually from the Actions tab
@@ -35,11 +39,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Set up secret file
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
          
       # 4. Runs the Python script
       - name: Run stock analysis script
