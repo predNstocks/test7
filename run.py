@@ -6,7 +6,7 @@ from datetime import datetime
 
 # --- Configuration ---
 # Easily modify this list to analyze different stock tickers.
-TICKERS = ["GLD", "SPY", "QQQ", "GOOGL", "AAPL", "MSFT", "AMZN"]
+TICKERS = ["GLD", "SPY", "QQQ", "GOOGL", "NVDA", "AAPL", "MSFT", "AMZN"]
 
 def calculate_n_score(ticker_symbol):
     """
@@ -40,22 +40,23 @@ def calculate_n_score(ticker_symbol):
         
         # 5. Get the current P/E ratio
         info = ticker.info
-        pe_ratio = info.get('trailingPE')
-        
+        pe_ratio = info.get('trailingPE', 20)
         if pe_ratio is None or pe_ratio <= 0:
             return f"--- {ticker_symbol}: P/E ratio not available or invalid. ---\n"
-            
+        
+        pe_ratio_fw = info.get('forwardPE', pe_ratio)
         # 6. Calculate the final score
-        final_score = (100.0 / pe_ratio)**2  * (n ** 3) 
+        final_score = 10000.0 / (pe_ratio_fw * pe_ratio)  * (n ** 3) 
         
         # 7. Format the results into a string
         result_string = (
             f"----------- {ticker_symbol} ----------\n"
-            f"  Current Price: ${current_price:,.2f}\n"
-            f"  5-Year High:   ${five_year_high:,.2f}\n"
-            f"  P/E Ratio:     {pe_ratio:.2f}\n"
-            f"  'n' value:     {n:.4f}\n"
-            f"  Final Score:   {final_score:.2f}\n"
+            f"  Current Price:     ${current_price:,.2f}\n"
+            f"  5-Year High:       ${five_year_high:,.2f}\n"
+            f"  Bakward P/E Ratio: {pe_ratio:.2f}\n"
+            f"  Forward P/E Ratio: {pe_ratio_fw:.2f}\n"
+            f"  'n' value:         {n:.4f}\n"
+            f"  Final Score:       {final_score:.2f}\n"
         )
         return result_string
 
