@@ -14,7 +14,7 @@ on:
   schedule:
     # This is a CRON job string that means "run at 08:00 UTC every day"
     # You can adjust the time as needed.
-    - cron: '0 13 * * * TZ=America/Los_Angeles'
+    - cron: '0 21 * * *'
     
 
 # Defines the job(s) that will run as part of the workflow
