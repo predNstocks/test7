@@ -46,7 +46,7 @@ def calculate_n_score(ticker_symbol):
         
         pe_ratio_fw = info.get('forwardPE', pe_ratio)
         # 6. Calculate the final score
-        final_score = 10000.0 / (pe_ratio_fw * pe_ratio)  * (n ** 3) 
+        final_score = 10000.0 * (pe_ratio_fw ** 2) / (pe_ratio ** 4)  * (n ** 3) 
         
         # 7. Format the results into a string
         result_string = (
