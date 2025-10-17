@@ -6,7 +6,7 @@ from datetime import datetime
 
 # --- Configuration ---
 # Easily modify this list to analyze different stock tickers.
-TICKERS = ["SPY", "GOOGL", "AAPL", "MSFT", "AMZN"]
+TICKERS = ["GLD", "SPY", "QQQ", "GOOGL", "AAPL", "MSFT", "AMZN"]
 
 def calculate_n_score(ticker_symbol):
     """
@@ -46,11 +46,11 @@ def calculate_n_score(ticker_symbol):
             return f"--- {ticker_symbol}: P/E ratio not available or invalid. ---\n"
             
         # 6. Calculate the final score
-        final_score = 100 * (n ** 2) / pe_ratio
+        final_score = (100.0 / pe_ratio)**2  * (n ** 3) 
         
         # 7. Format the results into a string
         result_string = (
-            f"--- Results for: {ticker_symbol} ---\n"
+            f"----------- {ticker_symbol} ----------\n"
             f"  Current Price: ${current_price:,.2f}\n"
             f"  5-Year High:   ${five_year_high:,.2f}\n"
             f"  P/E Ratio:     {pe_ratio:.2f}\n"
