@@ -59,11 +59,11 @@ def calculate_n_score(ticker_symbol):
         
         pe_ratio_fw = info.get('forwardPE', pe_ratio)
 
-        if ticker == "GLD":
-            # 6. Calculate the final score
-            final_score = 100.0 / pe_ratio_sp500 * (pe_ratio_fw ** 2) / (pe_ratio ** 2)  * (n ** 2) * n_ratio_sp500
-        else:
+        if ticker_symbol == "GLD":
+            # 6. Calculate the final score            
             final_score = pe_ratio_sp500 * (n ** 3)
+        else:
+            final_score = 250.0 / pe_ratio_sp500 * (pe_ratio_fw ** 2) / (pe_ratio ** 2)  * (n ** 2) * n_ratio_sp500
 
 
         # 7. Format the results into a string
