@@ -6,7 +6,7 @@ from datetime import datetime
 
 # --- Configuration ---
 # Easily modify this list to analyze different stock tickers.
-TICKERS = ["SPY", "GLD", "QQQ", "GOOGL", "NVDA", "AAPL", "MSFT", "AMZN"]
+TICKERS = ["SPY", "GLD", "QQQ", "GOOGL", "NVDA", "AAPL", "MSFT", "AMZN", "META", "AMD", "NFLX", "MU"]
 
 class Globals:
     pe_ratio_sp500 = 25.0
