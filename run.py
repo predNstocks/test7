@@ -63,7 +63,7 @@ def calculate_n_score(ticker_symbol):
             # 6. Calculate the final score            
             final_score = pe_ratio_sp500 * (n ** 3)
         else:
-            final_score = 250.0 / pe_ratio_sp500 * (pe_ratio_fw ** 2) / (pe_ratio ** 2)  * (n ** 2) * n_ratio_sp500
+            final_score = 250.0 / pe_ratio_sp500 * (pe_ratio ** 3) / (pe_ratio_fw ** 3)  * (n ** 2) * n_ratio_sp500
 
 
         # 7. Format the results into a string
