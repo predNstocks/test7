@@ -6,7 +6,7 @@ from datetime import datetime
 
 # --- Configuration ---
 # Easily modify this list to analyze different stock tickers.
-TICKERS = ["SPY", "GLD", "QQQ", "GOOGL", "NVDA", "AAPL", "MSFT", "AMZN", "META", "AMD", "NFLX", "MU"]
+TICKERS = ["SPY", "GLD", "QQQ", "GOOGL", "NVDA", "AAPL", "MSFT", "AMZN", "META", "AMD", "NFLX", "MU", "INTC"]
 
 class Globals:
     pe_ratio_sp500 = 25.0
@@ -45,7 +45,7 @@ def calculate_n_score(ticker_symbol):
         # 5. Get the current P/E ratio
         info = ticker.info
         pe_ratio = info.get('trailingPE', 20)
-        
+        peg_ratio = info.get('pegRatio', 1.0)
         if pe_ratio is None or pe_ratio <= 0:
             return f"--- {ticker_symbol}: P/E ratio not available or invalid. ---\n"
         
@@ -63,7 +63,7 @@ def calculate_n_score(ticker_symbol):
             # 6. Calculate the final score            
             final_score = pe_ratio_sp500 * (n ** 3)
         else:
-            final_score = 250.0 / pe_ratio_sp500 * (pe_ratio ** 3) / (pe_ratio_fw ** 3)  * (n ** 2) * n_ratio_sp500
+            final_score = (peg_ratio ** 2) * 250.0 / pe_ratio_sp500 * (pe_ratio ** 3) / (pe_ratio_fw ** 3)  * (n ** 2) * n_ratio_sp500
 
 
         # 7. Format the results into a string
