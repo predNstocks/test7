@@ -73,6 +73,7 @@ def calculate_n_score(ticker_symbol):
             f"  5-Year High:       ${five_year_high:,.2f}\n"
             f"  Bakward P/E Ratio: {pe_ratio:.2f}\n"
             f"  Forward P/E Ratio: {pe_ratio_fw:.2f}\n"
+            f"  PE/Growth Ratio:   {peg_ratio:.2f}\n"        
             f"  'n' value:         {n:.4f}\n"        
             f"  Final Score:       {final_score:.2f}\n"
         )
