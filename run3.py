@@ -17,7 +17,7 @@ def long_term_investment_score_v3(ticker_symbol: str, base_daily: float = 10.0) 
         current_price = info.get('currentPrice') or info['regularMarketPrice']
 
         # === SAFE ALL-TIME HIGH (handles splits & old tickers) ===
-        hist = t.history(period="10y", auto_adjust=True)
+        hist = t.history(period="5y", auto_adjust=True)
         if len(hist) > 500:
             ath = hist['High'].max()
             ath_date = hist['High'].idxmax().strftime("%Y-%m-%d")
@@ -49,14 +49,16 @@ def long_term_investment_score_v3(ticker_symbol: str, base_daily: float = 10.0) 
         score = 0.0
 
         # ROIC/ROE
-        if roic_proxy > 0.25:           score += 25
-        elif roic_proxy > 0.18:         score += 20
-        elif roic_proxy > 0.10:         score += 10
+        #if roic_proxy > 0.25:           score += 25
+        #elif roic_proxy > 0.18:         score += 20
+        #elif roic_proxy > 0.10:         score += 10
+        score += 100 * roic_proxy
 
         # FCF Yield
-        if fcf_yield and fcf_yield > 6: score += 20
-        elif fcf_yield and fcf_yield > 4: score += 12
-        elif fcf_yield and fcf_yield > 2: score += 6
+        #if fcf_yield and fcf_yield > 6: score += 20
+        #elif fcf_yield and fcf_yield > 4: score += 12
+        #elif fcf_yield and fcf_yield > 2: score += 6
+        score += 3 * fcf_yield
 
         # PEG
         if peg < 1.0:                   score += 15
