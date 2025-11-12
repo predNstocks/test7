@@ -4,6 +4,7 @@ import requests
 import os
 from datetime import datetime
 import json 
+from typing import Dict, Tuple
 
 # --- Configuration ---
 # Easily modify this list to analyze different stock tickers.
@@ -13,7 +14,6 @@ class Globals:
     pe_ratio_sp500 = 25.0
     n_ratio_sp500 = 1.0
 
-from typing import Dict, Tuple
 
 def long_term_investment_score(ticker_symbol: str, base_daily: float = 10.0) -> Dict:
     t = yf.Ticker(ticker_symbol)
