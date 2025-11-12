@@ -13,7 +13,6 @@ class Globals:
     pe_ratio_sp500 = 25.0
     n_ratio_sp500 = 1.0
 
-import numpy as np
 from typing import Dict, Tuple
 
 def long_term_investment_score(ticker_symbol: str, base_daily: float = 10.0) -> Dict:
