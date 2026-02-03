@@ -53,7 +53,6 @@ def run_analysis():
     
     return report
 
-    
 def send_telegram_message(message):
     """
     Sends a message to a Telegram chat using a bot.
@@ -86,57 +85,6 @@ def send_telegram_message(message):
     except requests.exceptions.RequestException as e:
         print(f"Failed to send message to Telegram: {e}")
 
-
-def run_analysis():
-    print("--- 2026 Global Macro Snapshot ---")
-    
-    # 1. FETCH DATA (Using Ticker.history for guaranteed Series output)
-    print("Syncing market prices...")
-    sp_ticker = yf.Ticker("^GSPC")
-    gold_ticker = yf.Ticker("GC=F")
-    
-    # Get last 5 days to ensure we have data even if market is closed today
-    sp_data = sp_ticker.history(period="5d")['Close']
-    gold_data = gold_ticker.history(period="5d")['Close']
-    
-    # 2. EXTRACT SCALARS SAFELY
-    # .iloc[-1] on a Series is a number. We add float() just to be sure.
-    current_sp = float(sp_data.iloc[-1])
-    current_gold = float(gold_data.iloc[-1])
-    ratio = current_sp / current_gold
-    
-    # 3. MACRO INDICATORS
-    # Buffett Indicator logic: Market Cap / GDP
-    # Since we can't get total Market Cap easily, we use S&P 500 as a proxy
-    print("Fetching GDP data...")
-    gdp_series = get_fred_safe("GDP")
-    current_gdp = float(gdp_series.iloc[-1])
-    
-    # 4. THE DECISION MATRIX (2026 Calibration)
-    # We use the S&P/Gold ratio as the 'Valuation Compass'
-    if ratio > 2.2:
-        regime, alloc = "EQUITY BUBBLE", [10, 40, 50] # 10% SPY, 40% Gold, 50% Cash
-    elif ratio < 0.8:
-        regime, alloc = "MONETARY CRISIS", [20, 70, 10] # Hard Assets heavy
-    elif 1.6 < ratio <= 2.2:
-        regime, alloc = "LATE CYCLE", [40, 20, 40] # Defensive Growth
-    else:
-        regime, alloc = "EARLY/MID CYCLE", [60, 20, 20] # Standard Bull
-
-    # 5. OUTPUT
-    print(f"\nRESULTS FOR {datetime.now().strftime('%Y-%m-%d')}")
-    print(f"S&P 500:        {current_sp:,.2f}")
-    print(f"Gold:           ${current_gold:,.2f}")
-    print(f"S&P/Gold Ratio: {ratio:.2f}")
-    print(f"Current Regime: **{regime}**")
-    
-    print("\n" + "="*30)
-    print(" RECOMMENDED ALLOCATION ")
-    print("="*30)
-    print(f" S&P 500:  {alloc[0]}%")
-    print(f" Gold:     {alloc[1]}%")
-    print(f" Cash:     {alloc[2]}%")
-    print("="*30)
 
 if __name__ == "__main__":
     analysis = run_analysis()
