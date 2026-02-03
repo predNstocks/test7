@@ -43,4 +43,4 @@ jobs:
          
       # 4. Runs the Python script
       - name: Run stock analysis script
-        run: python run.py 
+        run: python run4.py 
