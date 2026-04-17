@@ -1553,8 +1553,94 @@ class MacroPortfolioAllocator:
         Returns:
             dict: {'Crisis': prob, 'Bubble': prob, 'Inflation': prob, 'Normal': prob}
         """
-        from regime_4_merged import calculate_regime_probs_4merged, INITIAL_COEFS_4REGIME
         import numpy as np
+        
+        def softmax(scores):
+            """Convert scores to probabilities"""
+            scores = np.array(scores)
+            exp_scores = np.exp(scores - np.max(scores))
+            return exp_scores / np.sum(exp_scores)
+        
+        def calculate_regime_probs_4merged(metrics, coefs):
+            """Calculate 4-regime probabilities with interaction terms."""
+            # Extract features with defaults
+            z = metrics.get('z_score', 0.0)
+            trend = metrics.get('trend_equity', 1.0)
+            spread = metrics.get('credit_spread', 3.0)
+            vix = metrics.get('vix', 20.0) if not np.isnan(metrics.get('vix', 20.0)) else 20.0
+            cpi = metrics.get('inflation_yoy', 2.0)
+            curve = metrics.get('yield_curve', 50.0)
+            real_yield = metrics.get('real_yield', 1.0)
+            
+            # Crisis indicator for bubble context
+            crisis_indicator = (
+                max(0, vix - 25) / 20 +
+                max(0, spread - 4.5) / 3
+            )
+            crisis_indicator = min(1.0, crisis_indicator)
+            
+            # CRISIS: Equity decline + credit stress
+            crisis_score = (
+                coefs[0] * max(0, 0.90 - trend) / 0.20 +
+                coefs[1] * max(0, spread - 4.5) / 2.0 +
+                coefs[2] * max(0, vix - 30) / 20 +
+                coefs[3] * max(0, -curve - 20) / 50 +
+                coefs[16]  # baseline
+            )
+            
+            # BUBBLE: High valuation + momentum (with crisis context)
+            z_signal = max(0, z - 1.5) / 1.5
+            trend_signal = max(0, trend - 1.02) / 0.10
+            
+            bubble_score = (
+                coefs[4] * z_signal +
+                coefs[5] * trend_signal +
+                coefs[6] * max(0, 25 - vix) / 15 +
+                coefs[7] * z_signal * trend_signal +  # Interaction: both required
+                coefs[17]  # baseline
+            ) * (1 - 0.5 * crisis_indicator)  # Reduce bubble signal during crisis
+            
+            # INFLATION: High CPI (merged High Inflation + Stagflation)
+            inflation_score = (
+                coefs[8] * max(0, cpi - 4.0) / 5.0 +
+                coefs[9] * max(0, 1.00 - trend) / 0.15 +  # Weak growth penalty
+                coefs[10] * max(0, -real_yield) / 2.0 +
+                coefs[18]  # baseline
+            )
+            
+            # NORMAL: Balanced conditions (merged Growth + Neutral)
+            normal_score = (
+                coefs[11] * max(0, trend - 0.98) / 0.15 +
+                coefs[12] * max(0, 5.0 - spread) / 2.0 +
+                coefs[13] * max(0, curve) / 100 +
+                coefs[14] * max(0, 30 - vix) / 15 +
+                coefs[15] * max(0, 5.0 - cpi) / 3.0 +
+                coefs[19]  # baseline
+            )
+            
+            scores = [crisis_score, bubble_score, inflation_score, normal_score]
+            probs = softmax(scores)
+            
+            return {
+                'Crisis': probs[0],
+                'Bubble': probs[1],
+                'Inflation': probs[2],
+                'Normal': probs[3]
+            }
+        
+        # Initial hand-tuned coefficients for 4-regime system
+        INITIAL_COEFS_4REGIME = np.array([
+            # Crisis (4)
+            10.0, 5.0, 3.0, 2.0,
+            # Bubble (4)
+            8.0, 6.0, 2.0, 5.0,  # Added interaction term
+            # Inflation (3)
+            10.0, 4.0, 3.0,
+            # Normal (5)
+            8.0, 5.0, 3.0, 2.0, 1.0,
+            # Baselines (4)
+            0.1, 0.1, 0.1, 2.0  # Normal baseline higher
+        ])
         
         # Try to load optimized coefficients, fall back to hand-tuned if not available
         try:
@@ -3329,6 +3415,7 @@ def main(send_telegram=False, backtest=False, fast=False, offline=False, debug=F
 
     allocator.log_progress("Saving reports to files...")
     report_file = "reports/run9_report.md"
+    os.makedirs("reports", exist_ok=True)
     with open(report_file, "w") as f:
         f.write(comprehensive_report)
     allocator.log_progress(f"Comprehensive report saved to {report_file}")
