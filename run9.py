@@ -35,6 +35,9 @@ warnings.filterwarnings("ignore")
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
+os.makedirs("reports", exist_ok=True)
+os.makedirs("reports/figures", exist_ok=True)
+
 # Regime colors for visualizations
 REGIME_COLORS = {
     'Crisis': '#E74C3C',
@@ -3425,8 +3428,7 @@ def main(send_telegram=False, backtest=False, fast=False, offline=False, debug=F
     json_output = allocator.generate_json_output(metrics, weights, suballoc)
 
     allocator.log_progress("Saving reports to files...")
-    os.makedirs("reports", exist_ok=True)
-    os.makedirs("reports/figures", exist_ok=True)
+    
     report_file = "reports/run9_report.md"
     with open(report_file, "w") as f:
         f.write(comprehensive_report)
