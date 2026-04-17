@@ -3244,7 +3244,12 @@ class MacroPortfolioAllocator:
         if not token or not chat_id:
             raise RuntimeError("Telegram credentials are not configured in environment variables")
 
-        # Send text message
+        # Telegram has 4096 character limit, truncate if needed
+        max_length = 4000  # Leave some buffer
+        if len(message) > max_length:
+            message = message[:max_length] + "\n\n... (truncated, see PDF for full report)"
+        
+        # Send text message - try Markdown first, fall back to plain text
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         payload = {
             "chat_id": chat_id,
@@ -3253,6 +3258,12 @@ class MacroPortfolioAllocator:
             "disable_web_page_preview": True,
         }
         response = requests.post(url, json=payload, timeout=15)
+        
+        # If Markdown fails, try without parse_mode
+        if response.status_code == 400:
+            payload.pop("parse_mode")
+            response = requests.post(url, json=payload, timeout=15)
+        
         response.raise_for_status()
         
         # Send PDF if provided
@@ -3414,8 +3425,8 @@ def main(send_telegram=False, backtest=False, fast=False, offline=False, debug=F
     json_output = allocator.generate_json_output(metrics, weights, suballoc)
 
     allocator.log_progress("Saving reports to files...")
-    report_file = "reports/run9_report.md"
     os.makedirs("reports", exist_ok=True)
+    report_file = "reports/run9_report.md"
     with open(report_file, "w") as f:
         f.write(comprehensive_report)
     allocator.log_progress(f"Comprehensive report saved to {report_file}")
@@ -3448,7 +3459,8 @@ def main(send_telegram=False, backtest=False, fast=False, offline=False, debug=F
     if send_telegram:
         allocator.log_progress("Sending Telegram message...")
         pdf_path = "reports/run9_report.pdf" if not fast and os.path.exists("reports/run9_report.pdf") else None
-        allocator.send_telegram("\n".join(allocator.progress_log) + "\n\n" + message, pdf_path=pdf_path)
+        # Send only the summary message (not full progress log) to avoid exceeding Telegram limits
+        allocator.send_telegram(message, pdf_path=pdf_path)
         allocator.log_progress("Telegram message dispatched.")
 
 
