@@ -3426,6 +3426,7 @@ def main(send_telegram=False, backtest=False, fast=False, offline=False, debug=F
 
     allocator.log_progress("Saving reports to files...")
     os.makedirs("reports", exist_ok=True)
+    os.makedirs("reports/figures", exist_ok=True)
     report_file = "reports/run9_report.md"
     with open(report_file, "w") as f:
         f.write(comprehensive_report)
