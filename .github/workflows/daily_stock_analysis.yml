@@ -43,4 +43,4 @@ jobs:
          
       # 4. Runs the Python script
       - name: Run stock analysis script
-        run: python run7.py 
+        run: python3 run9.py --offline --send
