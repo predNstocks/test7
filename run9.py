@@ -118,25 +118,25 @@ def create_indicators_dashboard(metrics, prices=None, fred_data=None, save_path=
     fig.suptitle('Key Macro Indicators', fontsize=22, weight='bold', y=0.995)  # Larger title
     
     # Get 60 months of historical data
-    dates = pd.date_range(end=datetime.now(), periods=60, freq='M')
+    dates = pd.date_range(end=datetime.now(), periods=60, freq='ME')
     
     # Extract real historical data if available
     historical_data = {}
     
     if prices is not None and '^GSPC' in prices.columns and 'GLD' in prices.columns:
         # S&P/Gold ratio
-        sp_gold = (prices['^GSPC'] / prices['GLD']).resample('M').last().tail(60)
+        sp_gold = (prices['^GSPC'] / prices['GLD']).resample('ME').last().tail(60)
         historical_data['sp_gold_ratio'] = sp_gold.values.tolist()
         dates = sp_gold.index
     
     if prices is not None and '^VIX' in prices.columns:
         # VIX
-        vix_hist = prices['^VIX'].resample('M').last().tail(60)
+        vix_hist = prices['^VIX'].resample('ME').last().tail(60)
         historical_data['vix'] = vix_hist.values.tolist()
         
     if fred_data is not None and 'BAMLH0A0HYM2' in fred_data:
         # Credit spread (convert from % to bps)
-        credit = fred_data['BAMLH0A0HYM2'].resample('M').last().tail(60) * 100        
+        credit = fred_data['BAMLH0A0HYM2'].resample('ME').last().tail(60) * 100        
         historical_data['credit_spread'] = credit.values.tolist()
     
     if fred_data is not None and 'DGS10' in fred_data and 'CPIAUCSL' in fred_data:
@@ -150,8 +150,8 @@ def create_indicators_dashboard(metrics, prices=None, fred_data=None, save_path=
         cpi = cpi_df.iloc[:, 0] if isinstance(cpi_df, pd.DataFrame) else cpi_df
         
         # Resample and calculate
-        dgs10_monthly = dgs10.resample('M').last()
-        cpi_monthly = cpi.resample('M').last()
+        dgs10_monthly = dgs10.resample('ME').last()
+        cpi_monthly = cpi.resample('ME').last()
         cpi_yoy = cpi_monthly.pct_change(12) * 100
         
         # Calculate real yield and take last 60 months
@@ -161,13 +161,13 @@ def create_indicators_dashboard(metrics, prices=None, fred_data=None, save_path=
     
     if fred_data is not None and 'CPIAUCSL' in fred_data:
         # CPI YoY
-        cpi = fred_data['CPIAUCSL'].resample('M').last().tail(60)
+        cpi = fred_data['CPIAUCSL'].resample('ME').last().tail(60)
         cpi_yoy = cpi.pct_change(12) * 100
         historical_data['inflation_yoy'] = cpi_yoy.values.tolist()
     
     if fred_data is not None and 'T10Y2Y' in fred_data:
         # Yield curve
-        curve = fred_data['T10Y2Y'].resample('M').last().tail(60) * 100  # Convert to bps
+        curve = fred_data['T10Y2Y'].resample('ME').last().tail(60) * 100  # Convert to bps
         historical_data['yield_curve'] = curve.values.tolist()
     
     # Fallback: Use -999 constant to make missing data obvious
@@ -298,8 +298,10 @@ def create_valuation_history(metrics, save_path='reports/figures/06_valuation_hi
     fig.suptitle('Dual Valuation Metrics History', fontsize=20, weight='bold', y=0.995)
     
     dates = pd.date_range(end=datetime.now(), periods=120, freq='M')
-    buffett_z = np.random.randn(120) * 0.5 + 1.5
-    buffett_z[-1] = metrics.get('z_score', 1.5)
+    n_periods = len(dates)  # Use actual length
+    
+    # Use flat historical data instead of random
+    buffett_z = np.full(n_periods, metrics.get('z_score', 1.5))
     
     ax1.plot(dates, buffett_z, linewidth=2, color='#3498DB', label='Buffett Z-Score')
     ax1.axhline(metrics.get('z_score', 1.5), color='red', linestyle='--', 
@@ -314,8 +316,8 @@ def create_valuation_history(metrics, save_path='reports/figures/06_valuation_hi
     ax1.grid(True, alpha=0.3)
     ax1.axhline(0, color='black', linewidth=0.5)
     
-    cape_z = np.random.randn(120) * 0.5 + 1.3
-    cape_z[-1] = metrics.get('cape_z_score', 1.3)
+    # Use flat historical data instead of random
+    cape_z = np.full(n_periods, metrics.get('cape_z_score', 1.3))
     
     ax2.plot(dates, cape_z, linewidth=2, color='#9B59B6', label='CAPE Z-Score')
     ax2.axhline(metrics.get('cape_z_score', 1.3), color='red', linestyle='--', 
@@ -339,7 +341,7 @@ def create_valuation_history(metrics, save_path='reports/figures/06_valuation_hi
     plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
     print(f"✓ Created: {save_path}")
-
+    
 def create_all_visualizations(metrics, weights, regime_scores, current_regime, prices=None, fred_data=None):
     """Create all visualizations for the report."""
     print("\n" + "="*60)
