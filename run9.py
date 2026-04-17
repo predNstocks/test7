@@ -297,7 +297,7 @@ def create_valuation_history(metrics, save_path='reports/figures/06_valuation_hi
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
     fig.suptitle('Dual Valuation Metrics History', fontsize=20, weight='bold', y=0.995)
     
-    dates = pd.date_range(end=datetime.now(), periods=120, freq='M')
+    dates = pd.date_range(end=datetime.now(), periods=120, freq='ME')
     n_periods = len(dates)  # Use actual length
     
     # Use flat historical data instead of random
@@ -341,7 +341,7 @@ def create_valuation_history(metrics, save_path='reports/figures/06_valuation_hi
     plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
     print(f"✓ Created: {save_path}")
-    
+
 def create_all_visualizations(metrics, weights, regime_scores, current_regime, prices=None, fred_data=None):
     """Create all visualizations for the report."""
     print("\n" + "="*60)
