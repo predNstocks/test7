@@ -1,0 +1,86 @@
+name: Daily Portfolio Update
+
+env:
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+on:
+  schedule:
+    - cron: '0 16 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  daily-run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create plots directory
+        run: mkdir -p plots
+
+      - name: Run daily portfolio update
+        id: portfolio
+        run: |
+          python3 daily_operation.py --run --budget ${{ vars.MAX_DAILY_EXCHANGE || 500 }} 2>&1 | tee run_output.txt
+          echo "run_date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      - name: Check if CSV was modified
+        id: changes
+        run: |
+          if git diff --quiet daily_portfolio.csv 2>/dev/null; then
+            echo "csv_changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "csv_changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit updated portfolio state
+        if: steps.changes.outputs.csv_changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add daily_portfolio.csv
+          git commit -m "Auto-update portfolio $(date +%Y-%m-%d) [skip ci]"
+          git push
+
+      - name: Convert report to PDF
+        id: pdf
+        run: |
+          REPORT_FILE=$(ls -t report_*.md 2>/dev/null | head -1)
+          if [ -n "$REPORT_FILE" ]; then
+            pip install markdown weasyprint
+            python3 md_to_pdf.py "$REPORT_FILE" "report.pdf"
+            echo "pdf_created=true" >> $GITHUB_OUTPUT
+          else
+            echo "pdf_created=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send report via Telegram
+        if: env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != ''
+        run: |
+          REPORT_FILE=$(ls -t report_*.md 2>/dev/null | head -1)
+          PDF_FILE="report.pdf"
+          if [ -n "$REPORT_FILE" ]; then
+            if [ -f "$PDF_FILE" ]; then
+              python3 send_telegram.py "$REPORT_FILE" "$PDF_FILE"
+            else
+              python3 send_telegram.py "$REPORT_FILE"
+            fi
+          fi

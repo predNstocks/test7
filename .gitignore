@@ -1,3 +1,59 @@
-.env
-__pycache__
+# Python
 __pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Reports and plots (generated daily)
+report_*.md
+plots/
+
+# Local-only files
+test_*.py
+validate_*.py
+research_*.py
+run_constrained_*.py
+simple_backtest.py
+advanced_strategies.py
+comprehensive_test.py
+iteration_framework.py
+institutional_follower.py
+llm_analyst.py
+strategy_all_7.py
+strategy_final.py
+strategy_llm.py
+main.py
+optimize_params.py
+explain.md
+optimization.md
+DESIGN.md
+learnings.md
+llm_state.json
+constrained_backtest_*.csv
+backtest/
+results/
+strategies/
+data/
+
+# Secrets (never commit)
+.env
+*.key
+*.pem
+secrets.*
+GITHUB_SECRETS_SETUP.txt

@@ -1,0 +1,17 @@
+{
+  "budget": {
+    "max_daily_exchange": 500,
+    "currency": "USD"
+  },
+  "data": {
+    "cache_dir": "data_cache"
+  },
+  "report": {
+    "price_freshness_days": 7,
+    "indicator_freshness_days": 60,
+    "cape_freshness_days": 90
+  },
+  "initial_portfolio": {
+    "cash": 100000
+  }
+}
