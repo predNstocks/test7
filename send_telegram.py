@@ -1,9 +1,23 @@
 """
-Send markdown report to Telegram.
-Sends the text report and optionally the PDF file.
+Send daily report to Telegram.
+Sends a brief summary text and the PDF report file.
 Reads TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID from environment.
 """
 import os, sys, requests
+
+
+def extract_summary(text):
+    """Extract a brief summary from the markdown report (first ~1500 chars)."""
+    lines = text.split('\n')
+    summary_lines = []
+    for line in lines:
+        if line.startswith('## Trades') or line.startswith('## Current Allocation'):
+            break
+        summary_lines.append(line)
+    summary = '\n'.join(summary_lines)
+    if len(summary) > 3500:
+        summary = summary[:3500] + '\n...'
+    return summary
 
 
 def send_telegram_text(text):
@@ -23,9 +37,9 @@ def send_telegram_text(text):
 
     resp = requests.post(url, json=payload, timeout=30)
     if resp.status_code == 200:
-        print('Text message sent to Telegram.')
+        print('Summary sent to Telegram.')
     else:
-        print(f'Failed to send text: {resp.status_code} {resp.text}')
+        print(f'Failed to send summary: {resp.status_code} {resp.text}')
 
 
 def send_telegram_file(file_path, caption=''):
@@ -60,7 +74,8 @@ if __name__ == '__main__':
     with open(md_file) as f:
         text = f.read()
 
-    send_telegram_text(text)
+    summary = extract_summary(text)
+    send_telegram_text(summary)
 
     if pdf_file and os.path.exists(pdf_file):
         send_telegram_file(pdf_file, caption=f'Daily Report {os.path.basename(md_file)}')

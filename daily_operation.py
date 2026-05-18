@@ -305,19 +305,26 @@ def compute_todays_target():
     if t2 > 0:
         w = {a: v / t2 for a, v in w.items()}
 
-    return w, {'rs': rs, 'cape': ce, 'cpi': cp, 'unrate': ur}
+    return w, {
+        'rs': rs, 'm': mod,
+        'raw': {
+            'cpi_yoy': cp, 'cape': ce, 'unrate': ur,
+            'yield_inv': yi, 'fedfunds_real': rf, 'indpro_growth': ip,
+        }
+    }
 
 
 # ── Trade Calculation (diff-based) ─────────────────────
 
 def compute_diff_trades(target, current_shares, prices, budget, portfolio_value):
-    """Compute daily trades using percentage-diff approach.
+    """Compute daily trades using percentage-diff approach with per-asset cap.
 
     diff[a] = target_pct[a] - current_pct[a]
     scale = budget / sum(positive_diffs)
     trade_value[a] = diff[a] * scale
+    Each trade limited to budget * |diff[a]| (per-asset cap).
 
-    Guarantees: sum(buys) = sum(sells) = budget.
+    sum(buys) <= budget (before per-asset capping, equals; after, may be less).
     """
     current_pct = {}
     for a in ALL_ASSETS:
@@ -337,6 +344,11 @@ def compute_diff_trades(target, current_shares, prices, budget, portfolio_value)
     trades = {}
     for a in ALL_ASSETS:
         trade_value = diff[a] * scale
+        a_cap = budget * abs(diff[a])
+        if trade_value > 0:
+            trade_value = min(trade_value, a_cap)
+        else:
+            trade_value = max(trade_value, -a_cap)
         if abs(trade_value) > 0.01:
             trades[a] = trade_value
 
@@ -470,7 +482,7 @@ def run_trading_day(prices, budget, prev_shares, prev_cash, cash_injected=0):
             shares_change = value / px if px > 0 else 0
             trades_list.append((a, shares_change, value))
 
-    return new_shares, new_cash, target, trades_list, total
+    return new_shares, new_cash, target, trades_list, total, info
 
 
 # ── Plotting ───────────────────────────────────────────
@@ -562,7 +574,134 @@ def get_indicator_values():
     return indicators
 
 
-def generate_report(budget, prev_row, target, trades_list, prices, is_trading_day=True):
+def generate_regime_explanation(raw_indicators, rs, m):
+    """Dynamically generate regime detection explanation based on current indicator values."""
+    cpi_yoy = raw_indicators.get('cpi_yoy', 2)
+    cape = raw_indicators.get('cape', 25)
+    unrate = raw_indicators.get('unrate', 5)
+    yield_inv = raw_indicators.get('yield_inv', 0)
+    fedfunds_real = raw_indicators.get('fedfunds_real', 0)
+    indpro_growth = raw_indicators.get('indpro_growth', 0)
+
+    rc = sigmoid(cpi_yoy, 3.5, 3) * 0.25
+    rca = sigmoid(cape, 35, 2) * 0.25
+
+    yf = 0.15 if yield_inv else 0.0
+    ru = sigmoid(unrate, 5.5, 3) * yf
+    rff = sigmoid(fedfunds_real, 1, 5) * 0.30
+    rind = sigmoid(indpro_growth, 2, 5) * 0.00
+    total_weight = 0.95
+
+    if rs < 0.33:
+        regime_label = 'Risk-On'
+        regime_desc = 'Low macro risk — equities and risk assets favored'
+    elif rs > 0.66:
+        regime_label = 'Risk-Off'
+        regime_desc = 'High macro risk — bonds and safe havens favored'
+    else:
+        regime_label = 'Neutral'
+        regime_desc = 'Moderate macro risk — balanced allocation'
+
+    lines = []
+    lines.append('## Regime Detection')
+    lines.append('')
+    lines.append('### Risk Score Formula')
+    lines.append('')
+    lines.append('$$')
+    lines.append(r'rs = \frac{rc \cdot w_{cpi} + rca \cdot w_{cape} + ru \cdot w_{unrate} + rff \cdot w_{fedfunds} + rind \cdot w_{indpro}}{\sum w_i}')
+    lines.append('$$')
+    lines.append('')
+    lines.append(r'Each component: $r_i = \sigma(value_i, c_i, k_i) \cdot w_i$ where $\sigma(x, c, k) = \frac{1}{1 + e^{-k(x-c)}}$')
+    lines.append('')
+    lines.append('| Component | Raw Value | Sigmoid(r) | Weight | Contribution |')
+    lines.append('|---|---|---|---|---|')
+
+    contribs = [
+        ('CPI YoY', f'{cpi_yoy:.2f}%', f'{rc:.3f}', '0.25', rc),
+        ('CAPE', f'{cape:.1f}', f'{rca:.3f}', '0.25', rca),
+        ('UNRATE', f'{unrate:.2f}%', f'{ru:.3f}', f'0.15{"×inv" if yield_inv else "×0(y)"}', ru),
+        ('FEDFUNDS real', f'{fedfunds_real:.2f}%', f'{rff:.3f}', '0.30', rff),
+        ('INDPRO growth', f'{indpro_growth:.2f}%', f'{rind:.3f}', '0.00', rind),
+    ]
+    for name, raw_val, sig_val, weight, contrib in contribs:
+        lines.append(f'| {name} | {raw_val} | {sig_val} | {weight} | {contrib:.3f} |')
+
+    lines.append('')
+    lines.append(f'**Risk Score (rs):** {rs:.3f} — **{regime_label}**')
+    lines.append('')
+    lines.append(f'**Modulation (m):** {m:.3f} _(m = $1 - (2rs - 1)^2$, peaks at rs=0.5)_')
+    lines.append('')
+    lines.append('| Regime | rs Range | Strategy Response |')
+    lines.append('|---|---|---|')
+    lines.append('| Risk-On | rs < 0.33 | Equities overweight, bonds underweight |')
+    lines.append('| Neutral | 0.33 ≤ rs ≤ 0.66 | Balanced equity/bond split, gold enhanced |')
+    lines.append('| Risk-Off | rs > 0.66 | Bonds overweight, equities underweight, international cut |')
+    lines.append('')
+    lines.append(f'**Interpretation:** {regime_desc}.')
+    lines.append('')
+    return '\n'.join(lines)
+
+
+def generate_allocation_explanation(target, rs, m, cape_val, prices):
+    """Dynamically generate allocation equation explanation based on current rs/m values."""
+    total_equity = max(0, 0.65 - 0.38 * rs)
+    tlt_raw = 0.20 + 0.42 * rs
+    shy_raw = 0.05 + 0.12 * rs
+    gld_raw = 0.10 + 0.18 * m
+    dbc_raw = 0.00 + 0.12 * m
+
+    intl_factor = sigmoid(cape_val, 28, 3)
+    intl_share = 0.35 * intl_factor * max(0, 1 - rs) ** 3
+    domestic_share = max(0, 1 - intl_share)
+    spy_raw = total_equity * domestic_share
+    vxus_raw = total_equity * intl_share * 0.5
+    ewy_raw = total_equity * intl_share * 0.5
+
+    raw_pre_normalize = {
+        'SPY': spy_raw, 'TLT': tlt_raw, 'GLD': gld_raw,
+        'SHY': shy_raw, 'DBC': dbc_raw, 'VXUS': vxus_raw, 'EWY': ewy_raw,
+    }
+    tot = sum(raw_pre_normalize.values())
+    if tot > 0:
+        pre_ath = {a: v / tot for a, v in raw_pre_normalize.items()}
+    else:
+        pre_ath = dict(raw_pre_normalize)
+
+    lines = []
+    lines.append('## Allocation Equations')
+    lines.append('')
+    lines.append('### Base Allocation (before ATH/SMA adjustments)')
+    lines.append('')
+    lines.append(f'$\\bullet$ total_equity = max(0, 0.65 − 0.38 × {rs:.3f}) = **{total_equity:.1%}**')
+    lines.append(f'$\\bullet$ TLT = 0.20 + 0.42 × {rs:.3f} = **{tlt_raw:.1%}**')
+    lines.append(f'$\\bullet$ SHY = 0.05 + 0.12 × {rs:.3f} = **{shy_raw:.1%}**')
+    lines.append(f'$\\bullet$ GLD = 0.10 + 0.18 × {m:.3f} = **{gld_raw:.1%}**')
+    lines.append(f'$\\bullet$ DBC = 0.00 + 0.12 × {m:.3f} = **{dbc_raw:.1%}**')
+    lines.append('')
+    lines.append(f'$\\bullet$ intl_factor = σ(CAPE={cape_val:.1f}, center=28, k=3) = **{intl_factor:.3f}**')
+    lines.append(f'$\\bullet$ intl_share = 0.35 × {intl_factor:.3f} × max(0, 1 − {rs:.3f})³ = **{intl_share:.1%}**')
+    lines.append(f'$\\bullet$ domestic_share = 1 − {intl_share:.1%} = **{domestic_share:.1%}**')
+    lines.append('')
+    lines.append(f'$\\bullet$ SPY = {total_equity:.1%} × {domestic_share:.1%} = **{spy_raw:.1%}**')
+    lines.append(f'$\\bullet$ VXUS = {total_equity:.1%} × {intl_share:.1%} × 0.5 = **{vxus_raw:.1%}**')
+    lines.append(f'$\\bullet$ EWY = {total_equity:.1%} × {intl_share:.1%} × 0.5 = **{ewy_raw:.1%}**')
+    lines.append('')
+    lines.append('### Normalized st8 Target')
+    lines.append('')
+    lines.append('| Asset | Raw | Normalized | After ATH | After SMA | Final |')
+    lines.append('|---|---|---|---|---|---|')
+    for a in ALL_ASSETS:
+        raw_pct = raw_pre_normalize.get(a, 0) * 100
+        norm_pct = pre_ath.get(a, 0) * 100
+        final = target.get(a, 0) * 100
+        lines.append(f'| {a} | {raw_pct:.1f}% | {norm_pct:.1f}% | — | — | {final:.1f}% |')
+    lines.append('')
+    lines.append('*ATH dip-buying and SMA trend filters are applied after normalization to produce the final weights.*')
+    lines.append('')
+    return '\n'.join(lines)
+
+
+def generate_report(budget, prev_row, target, trades_list, prices, is_trading_day=True, regime_info=None):
     df = load_csv()
     prices = prices or get_last_known_prices()
     lines = []
@@ -639,10 +778,15 @@ def generate_report(budget, prev_row, target, trades_list, prices, is_trading_da
                 curr_pct = curr_val / pv * 100 if pv > 0 else 0
                 gap = tgt_pct - curr_pct
                 sign = '+' if gap >= 0 else ''
-                max_buy = min(budget, max(0, tgt_dollar - curr_val))
+                max_gap = budget * abs(gap) / 100
+                max_buy = min(max_gap, max(0, tgt_dollar - curr_val))
                 lines.append(f'| {a} | {tgt_pct:.1f}% | ${tgt_dollar:>8,.0f} | ${max_buy:,.0f} | {curr_pct:.1f}% | {sign}{gap:.1f}% |')
             else:
                 lines.append(f'| {a} | {tgt_pct:.1f}% | -- | -- | -- | -- |')
+        if prev_row is not None:
+            cash_balance = float(prev_row.get('cash_balance', 0))
+            cash_pct = cash_balance / pv * 100 if pv > 0 else 0
+            lines.append(f'| CASH | 0.0% | $0 | $0 | {cash_pct:.1f}% | −{cash_pct:.1f}% |')
         lines.append('')
 
     # Data Status
@@ -703,6 +847,15 @@ def generate_report(budget, prev_row, target, trades_list, prices, is_trading_da
             lines.append(f'| | | | **${total_traded:,.2f}** | Budget used |')
         lines.append('')
 
+        # Regime & Allocation Explanation
+        if regime_info:
+            raw_i = regime_info.get('raw', {})
+            rs = regime_info.get('rs', 0.5)
+            m = regime_info.get('m', 0.5)
+            cape_val = raw_i.get('cape', 25)
+            lines.append(generate_regime_explanation(raw_i, rs, m))
+            lines.append(generate_allocation_explanation(target, rs, m, cape_val, prices))
+
         # Current Allocation
         lines.append('## Current Allocation')
         if prev_row is not None:
@@ -718,6 +871,9 @@ def generate_report(budget, prev_row, target, trades_list, prices, is_trading_da
                 delta = curr_pct - tgt
                 sign = '+' if delta >= 0 else ''
                 lines.append(f'| {a} | {tgt:.1f}% | ${curr_val:>8,.2f} | {curr_pct:.1f}% | {sign}{delta:.1f}% |')
+            cash_balance = float(prev_row.get('cash_balance', 0))
+            cash_pct = cash_balance / pv * 100 if pv > 0 else 0
+            lines.append(f'| CASH | 0.0% | ${cash_balance:>8,.2f} | {cash_pct:.1f}% | −{cash_pct:.1f}% |')
             lines.append('')
 
     # Portfolio Value
@@ -832,7 +988,7 @@ def cmd_run(budget=None):
         print(f'Today ({TODAY}) already recorded. Regenerating report...')
         target, info = compute_todays_target()
         prices = get_last_known_prices()
-        report, path = generate_report(budget, last, target, [], prices, is_trading_day=False)
+        report, path = generate_report(budget, last, target, [], prices, is_trading_day=False, regime_info=info)
         print(report)
         print(f'\nReport: {path}')
         return
@@ -842,7 +998,7 @@ def cmd_run(budget=None):
         print('No new trading days to process.')
         target, info = compute_todays_target()
         prices = get_last_known_prices()
-        report, path = generate_report(budget, last, target, [], prices, is_trading_day=False)
+        report, path = generate_report(budget, last, target, [], prices, is_trading_day=False, regime_info=info)
         print(report)
         print(f'\nReport: {path}')
         return
@@ -874,6 +1030,7 @@ def cmd_run(budget=None):
     last_target = None
     last_trades = []
     last_day_prices = {}
+    last_regime_info = None
     for d in all_dates:
         d_date = d.date() if hasattr(d, 'date') else d
         d_str = d_date.isoformat()
@@ -889,9 +1046,10 @@ def cmd_run(budget=None):
         if cash_inj > 0:
             print(f'  + Injecting ${cash_inj:,.0f} on {d_date}')
 
-        new_shares, new_cash, target, trades_list, total = run_trading_day(
+        result = run_trading_day(
             day_prices, budget, current_shares, current_cash, cash_injected=cash_inj
         )
+        new_shares, new_cash, target, trades_list, total, info = result
         if total is None:
             print(f'  {d_date}: strategy data not available, skipping')
             continue
@@ -902,11 +1060,13 @@ def cmd_run(budget=None):
         last_target = target
         last_trades = trades_list
         last_day_prices = day_prices
+        last_regime_info = info
         print(f'  {d_date}: ${total:,.2f} (trades: {len(trades_list)})')
 
     last_row = get_latest_row()
     is_trading = last_target is not None
-    report, path = generate_report(budget, last_row, last_target, last_trades, last_day_prices, is_trading_day=is_trading)
+    report, path = generate_report(budget, last_row, last_target, last_trades, last_day_prices,
+                                    is_trading_day=is_trading, regime_info=last_regime_info)
     print(f'\nReport: {path}')
     print(report[:2000] + ('\n... (truncated)' if len(report) > 2000 else ''))
 
@@ -946,7 +1106,9 @@ def cmd_report_only():
 
     result = compute_todays_target()
     target = result[0] if result else None
-    report, path = generate_report(CONFIG.budget.max_daily_exchange, last, target, [], day_prices, is_trading_day=True)
+    regime_info = result[1] if result else None
+    report, path = generate_report(CONFIG.budget.max_daily_exchange, last, target, [], day_prices,
+                                    is_trading_day=True, regime_info=regime_info)
     print(report)
     print(f'\nReport: {path}')
 
