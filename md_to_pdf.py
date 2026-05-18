@@ -1,15 +1,42 @@
 """
 Convert markdown report to PDF.
-Uses markdown + weasyprint for clean PDF generation.
+Converts LaTeX math to MathML (weasyprint native) and renders via weasyprint.
 """
-import sys
+import sys, re
 import markdown
-from weasyprint import HTML, CSS
+from weasyprint import HTML
+
+
+def _convert_math_to_mathml(text):
+    """Convert \(...\) inline and $$...$$ display LaTeX to MathML."""
+    from latex2mathml.converter import convert as latex2mathml_convert
+
+    def _replace_display(m):
+        latex = m.group(1).strip()
+        try:
+            mathml = latex2mathml_convert(latex)
+            mathml = mathml.replace('<math', '<math display="block"', 1)
+            return mathml
+        except Exception:
+            return m.group(0)
+
+    def _replace_inline(m):
+        latex = m.group(1).strip()
+        try:
+            return latex2mathml_convert(latex)
+        except Exception:
+            return m.group(0)
+
+    text = re.sub(r'\$\$(.+?)\$\$', _replace_display, text, flags=re.DOTALL)
+    text = re.sub(r'\\\((.+?)\\\)', _replace_inline, text)
+    return text
 
 
 def md_to_pdf(md_path, pdf_path):
     with open(md_path) as f:
         md_content = f.read()
+
+    md_content = _convert_math_to_mathml(md_content)
 
     html_body = markdown.markdown(md_content, extensions=['tables'])
 
@@ -28,6 +55,7 @@ td {{ border: 1px solid #d1d5db; padding: 4px 10px; }}
 tr:nth-child(even) {{ background: #f9fafb; }}
 strong {{ color: #1e40af; }}
 img {{ max-width: 100%; }}
+math {{ font-size: 1em; }}
 </style>
 </head>
 <body>
